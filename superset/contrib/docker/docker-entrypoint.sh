@@ -17,6 +17,15 @@
 #
 set -ex
 
+if [ "`whoami`" = "root" ] && [ -n "$LOCAL_USER" ]; then
+    find . -group superset -exec chgrp $LOCAL_USER '{}' \;
+    groupmod -g $LOCAL_USER superset
+    usermod -u $LOCAL_USER superset
+
+    su -c "/entrypoint.sh" superset
+    exit $?
+fi
+
 if [ "$SUPERSET_NO_DB_INIT" != "true" ]; then
     python bootstrap.py
 fi
@@ -27,8 +36,8 @@ elif [ "$SUPERSET_ENV" = "development" ]; then
     celery worker --app=superset.sql_lab:celery_app --pool=gevent -Ofair &
     # needed by superset runserver
     (cd superset/assets/ && npm ci)
-    (cd superset/assets/ && npm run dev) &
-    FLASK_ENV=development FLASK_APP=superset:app flask run -p 8088 --with-threads --reload --debugger --host=0.0.0.0
+    (cd superset/assets/ && npm run dev-server -- --host=0.0.0.0 --port=8088 --supersetPort=8081) &
+    FLASK_ENV=development FLASK_APP=superset:app flask run -p 8081 --with-threads --reload --debugger --host=0.0.0.0
 elif [ "$SUPERSET_ENV" = "production" ]; then
     celery worker --app=superset.sql_lab:celery_app --pool=gevent -Ofair &
     gunicorn --bind  0.0.0.0:8088 \

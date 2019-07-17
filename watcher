@@ -1,0 +1,47 @@
+#!/bin/bash
+
+trap ctrl_c SIGINT
+
+function ctrl_c {
+  make --no-print-directory clean && \
+    echo -e "\e[92mPatch cleaned\e[0m" || \
+    echo -e "\e[33mCould not clean patch\e[0m"
+  exit $?
+}
+
+function watch_inotify {
+  inotifywait --recursive \
+    --event modify,move,create,delete \
+    $DIRECTORY_TO_OBSERVE
+}
+
+function watch_fswatch {
+  fswatch --recursive --one-event \
+    --event Created --event Updated --event Removed \
+    ${DIRECTORY_TO_OBSERVE}
+}
+
+
+if command -v inotifywait > /dev/null 2>&1; then
+  wichWatcher=inotify
+  function watcher { watch_inotify; }
+elif command -v fswatch > /dev/null 2>&1; then
+  wichWatcher=fswatch
+  function watcher { watch_fswatch; }
+else
+  echo -e "\e[31m[ERROR] No watcher available\e[0m"
+  echo "Neither 'inotify' nor 'fswatch' are available."
+  echo "You can follow 'CONTRIBUTING.md' guidelines to install one of them,"
+  echo ""
+  echo -e "\e[33malternative:\e[0m"
+  echo "  run 'make set-override' first,"
+  echo "  and then 'make patch' every time you change a file in 'srcd' dir"
+  echo ""
+  exit 1
+fi
+
+make --no-print-directory apply-patch
+echo -e "\e[92mWatching for changes in 'srcd'; using '${wichWatcher}' ...\e[0m"
+while watcher; do
+  make --no-print-directory apply-patch
+done

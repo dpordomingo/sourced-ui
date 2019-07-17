@@ -7,6 +7,11 @@ SUPERSET_DIR = superset
 # Directory with custom code to copy into SUPERSET_DIR
 PATCH_SOURCE_DIR = srcd
 
+# Directory with template for docker-compose.override.yml
+OVERRIDE_TEMPLATE_PATH := ${PATCH_SOURCE_DIR}/contrib/docker/docker-compose.override.yml
+# Directory for the sourced global docker-compose.override.yml
+OVERRIDE_OUTPUT_PATH := ~/.sourced/compose-files/__active__/docker-compose.override.yml
+
 # Name of the docker image to build
 DOCKER_IMAGE_NAME ?= srcd/sourced-ui
 # Docker registry where the docker image should be pushed to.
@@ -33,9 +38,13 @@ IS_RELEASE := $(shell echo $(VERSION) | grep -q -E '^v[[:digit:]]+\.[[:digit:]]+
 
 all: build
 
-# Copy src-d files in the superset repository
+# Clean, and copy src-d files in the superset repository
 .PHONY: patch
-patch: clean
+patch: clean apply-patch
+
+# Copy src-d files in the superset repository
+.PHONY: apply-patch
+apply-patch:
 	cp -r $(PATCH_SOURCE_DIR)/* $(SUPERSET_DIR)/
 
 # Copy src-d files in the superset repository using symlinks. it's useful for development.
@@ -48,6 +57,25 @@ patch-dev: clean
 		ln -s "$(PWD)/$${file}" "$(SUPERSET_DIR)/$${to}"; \
 	done; \
 	ln -s "$(PWD)/$(PATCH_SOURCE_DIR)/superset/superset_config_dev.py" "$(SUPERSET_DIR)/superset_config.py"; \
+
+# Start a watcher that will run 'make apply-patch' automatically when 'srcd' changes
+# It will require either inotify or fswatch. More info in CONTRIBUTING.md
+.PHONY: watch
+watch:
+	@DIRECTORY_TO_OBSERVE=$(PATCH_SOURCE_DIR) bash watcher
+
+SOURCED_DIR_OWNER := `stat -c "%u" superset/superset`
+# Writes the proper `docker-compose.override.yml` as the sourced global override file
+.PHONY: set-override
+set-override:
+	@sed \
+		-e "s~\$${SOURCED_UI_ABS_PATH}~`pwd`~" \
+		-e "s~\$${LOCAL_USER:-}~$(SOURCED_DIR_OWNER)~" \
+		$(OVERRIDE_TEMPLATE_PATH) > $(OVERRIDE_OUTPUT_PATH)
+
+# Prepares the development enviroment with with hot reloading
+.PHONY: dev-prepare
+dev-prepare: set-override watch
 
 # Create docker image
 .PHONY: patch
@@ -90,6 +118,7 @@ docker-push-latest-release:
 # Clean superset directory from copied files
 .PHONY: clean
 clean:
+	rm -rf $(OVERRIDE_OUTPUT_PATH)
 	rm -f "$(SUPERSET_DIR)/superset_config.py"
 	git clean -fd $(SUPERSET_DIR)
 
