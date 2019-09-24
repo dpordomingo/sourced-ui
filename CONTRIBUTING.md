@@ -200,9 +200,9 @@ $ git subtree merge -P superset <release-tag> --squash
     ```
     $ make patch
     $ cd superset
-    $ TOXENV=black tox
-    $ TOXENV=flake8 tox
-    $ TOXENV=pylint tox
+    $ tox -e black
+    $ tox -e flake8
+    $ tox -e pylint
     ```
 - Merge migrations (if needed)
     ```
@@ -213,16 +213,19 @@ $ git subtree merge -P superset <release-tag> --squash
 - Run tests
     ```
     $ docker run --rm -p 6379:6379 redis
-    $ TOXENV=py36-sqlite tox
+    $ tox -e py36-sqlite
     ```
-- Build & check it with srcd-ce
+- Check (and ported if needed) config files:
+  - `superset/contib/docker`
+  - `superset/superset/config.py`
+  - `superset/.travis.yml`
+- Update `Makefile` with the new `SUPERSET_VERSION`
+- Test the upgrade building & checking it with `src-d/sourced-ce`
     ```
     $ make build
-    <run srcd-ce with this image>
+    # it will build `srcd/sourced-ui:latest`
+    $ sourced init local .
+    $ cd ~/.sourced/workdirs/__active__
+    $ docker-compose images sourced-ui
+    # confirm that it uses the `srcd/sourced-ui:latest` image that you just built
     ```
-- Check if some changes to configuration should be ported, files to check:
-  - superset/contib/docker
-  - superset/superset/config.py
-  - superset/.travis.yml
-- Update `Makefile`
-- Test upgrade
