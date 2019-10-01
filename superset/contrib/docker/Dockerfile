@@ -97,6 +97,8 @@ ENV PATH=/home/superset/superset/bin:$PATH \
 
 COPY --chown=superset:superset --from=static /home/superset/superset/assets/dist superset/assets/dist
 
+RUN apt-get install -y build-essential git libmariadb-dev-compat libkrb5-dev
+
 USER superset
 
 COPY contrib/docker/superset_config.py ./superset/
@@ -107,3 +109,8 @@ ENTRYPOINT ["/entrypoint.sh"]
 HEALTHCHECK CMD ["curl", "-f", "http://localhost:8088/health"]
 
 EXPOSE 8088
+
+COPY tox.ini .
+COPY setup.cfg .
+COPY setup.py .
+COPY tests tests

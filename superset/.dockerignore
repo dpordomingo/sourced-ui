@@ -31,7 +31,6 @@
 **/*.sqllite
 **/*.swp
 
-tests/
 docs/
 install/
 superset/assets/node_modules/
